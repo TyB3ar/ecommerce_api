@@ -126,7 +126,7 @@ def get_users():
 
     return users_schema.jsonify(users), 200 
 
-# Retrieve User by ID                                       ---- This Method is taking Long Time
+# Retrieve User by ID                                    
 @app.route('/users/<int:id>', methods=["GET"])
 def get_user(id):
     user = db.session.get(User, id)
@@ -260,6 +260,7 @@ def delete_product(id):
 # Get all Orders for a User 
 
 # Get all Products for an Order
+
 
 
 if __name__ == "__main__":
