@@ -5,7 +5,6 @@ from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column, relationship
 from sqlalchemy import ForeignKey, Table, Column, String, select, DateTime, Float, UniqueConstraint
 from marshmallow import ValidationError
 from typing import List, Optional
-from datetime import datetime, timezone
 
 # Initialize Flask App 
 app = Flask(__name__) 
@@ -24,16 +23,6 @@ db.init_app(app)
 ma = Marshmallow(app) 
 
 # ----- Models ----- 
-
-'''
-# User-Orders Association Table
-user_orders = Table(
-    "user_orders", 
-    Base.metadata, 
-    Column("user_id", ForeignKey("users.id"), primary_key=True),
-    Column("order_id", ForeignKey("orders.id"), primary_key=True)
-)
-'''
 
 # Order-Products Association Table 
 order_products = Table(
