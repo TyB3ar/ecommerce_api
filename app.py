@@ -25,6 +25,7 @@ ma = Marshmallow(app)
 
 # ----- Models ----- 
 
+'''
 # User-Orders Association Table
 user_orders = Table(
     "user_orders", 
@@ -32,6 +33,7 @@ user_orders = Table(
     Column("user_id", ForeignKey("users.id"), primary_key=True),
     Column("order_id", ForeignKey("orders.id"), primary_key=True)
 )
+'''
 
 # Order-Products Association Table 
 order_products = Table(
@@ -79,8 +81,7 @@ class Product(Base):
     # many to many with orders
     orders: Mapped[List["Order"]] = relationship("Order", secondary=order_products, back_populates="products")
     
-  
-    
+
 # ----- Schemas ----- 
 
 # User Schema 
@@ -136,7 +137,7 @@ def get_user(id):
     return user_schema.jsonify(user), 200 
 
 # Create New User
-@app.route("/users", methods=['POST'])
+@app.route("/users", methods=["POST"])
 def create_user():
     try:
         user_data = user_schema.load(request.json) # deserialize json data 
@@ -170,7 +171,7 @@ def update_user(id):
     return user_schema.jsonify(user), 200 
 
 # Delete User by ID 
-@app.route('/users/<int:id>', methods=['DELETE']) 
+@app.route('/users/<int:id>', methods=["DELETE"]) 
 def delete_user(id):
     user = db.session.get(User, id)
     
@@ -181,17 +182,71 @@ def delete_user(id):
     db.session.commit() 
     return jsonify({"message": f"Successfully deleted user {id}"}), 200 
 
+
 # --- Product Endpoints ---
 
 # Retrieve All Products
+@app.route("/products", methods=["GET"])
+def get_products():
+    query = select(Product) 
+    products = db.session.execute(query).scalars().all()
+
+    return products_schema.jsonify(products), 200 
 
 # Retrieve Product by ID
+@app.route("/products/<int:id>", methods=["GET"])
+def get_product(id):
+    product = db.session.get(Product, id)
+    
+    if not product:
+        return jsonify({"message": "Product not found"}), 404
+    
+    return product_schema.jsonify(product), 200 
 
 # Create a new Product
+@app.route("/products", methods=["POST"])
+def create_product():
+    try:
+        product_data = product_schema.load(request.json) # deserialize json data 
+    except ValidationError as e:
+        return jsonify(e.messages), 400
+    
+    new_product = Product(product_name=product_data['product_name'], price=product_data['price']) 
+    db.session.add(new_product)
+    db.session.commit()
+    
+    return product_schema.jsonify(new_product), 200  
 
 # Update Product by ID
+@app.route("/products/<int:id>", methods=["PUT"])
+def update_product(id):
+    product = db.session.get(Product, id)
+    
+    if not product:
+        return jsonify({"message": "Product not found"}), 404 
+    
+    try:
+        product_data = product_schema.load(request.json)
+    except ValidationError as e:
+        return jsonify(e.messages), 400 
+    
+    product.product_name = product_data['product_name']
+    product.price = product_data['price'] 
+    
+    db.session.commit()
+    return product_schema.jsonify(product), 200 
 
 # Delete Product by ID 
+@app.route('/products/<int:id>', methods=["DELETE"]) 
+def delete_product(id):
+    product = db.session.get(Product, id)
+    
+    if not product:
+        return jsonify({"message": "Invalid product id"}), 400
+    
+    db.session.delete(product)
+    db.session.commit() 
+    return jsonify({"message": f"Successfully deleted product {id}"}), 200 
 
 
 # --- Order Endpoints --- 
