@@ -3,8 +3,9 @@ from flask_sqlalchemy import SQLAlchemy
 from flask_marshmallow import Marshmallow
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column, relationship
 from sqlalchemy import ForeignKey, Table, Column, String, select, DateTime, Float, UniqueConstraint
-from marshmallow import ValidationError
+from marshmallow import ValidationError, fields
 from typing import List, Optional
+from datetime import datetime
 
 # Initialize Flask App 
 app = Flask(__name__) 
@@ -85,6 +86,7 @@ class OrderSchema(ma.SQLAlchemyAutoSchema):
         include_fk = True
         
     products = ma.Nested("ProductSchema", many=True) 
+    order_date = fields.DateTime(format="%Y-%m-%dT%H:%M:%S")
         
 # Product Schema
 class ProductSchema(ma.SQLAlchemyAutoSchema):
@@ -241,15 +243,93 @@ def delete_product(id):
 # --- Order Endpoints --- 
 
 # Create a new Order (requires user ID and Order Date) 
+@app.route("/orders", methods=["POST"])
+def create_order():
+    try:
+        order_data = request.json
+        user_id = order_data.get("user_id")
+        order_date_str = order_data.get("order_date")
+        
+        order_date = datetime.strptime(order_date_str, "%Y-%m-%dT%H:%M:%S")
+        
+        user = db.session.get(User, user_id)
+        if not user: 
+            return jsonify({"message": "User not found"}), 404
+        
+        new_order = Order(user_id=user_id, order_date=order_date)
+        db.session.add(new_order)
+        db.session.commit() 
+        
+        return order_schema.jsonify(new_order), 201
+    except ValidationError as e:
+        return jsonify(e.messages), 400 
+        
 
 # Add product to an Order (prevent duplicates) 
+@app.route("/orders/<int:order_id>/add_product/<int:product_id>", methods=["PUT"])
+def add_product_to_order(order_id, product_id):
+    order = db.session.get(Order, order_id)
+    if not order:
+        return jsonify({"message": "Order not found"}), 404
+
+    # Validate product existence
+    product = db.session.get(Product, product_id)
+    if not product:
+        return jsonify({"message": "Product not found"}), 404
+
+    # Prevent duplicate entry
+    if product in order.products:
+        return jsonify({"message": "Product already added to this order"}), 400
+
+    # Add product to the order
+    order.products.append(product)
+    db.session.commit()
+
+    return jsonify({"message": f"Product '{product.product_name}' added to Order {order_id}"}), 200
+
 
 # Remove Product from an Order
+@app.route("/orders/<int:order_id>/remove_product/<int:product_id>", methods=["DELETE"])
+def delete_product_from_order(order_id, product_id):
+    order = db.session.get(Order, order_id)
+    if not order:
+        return jsonify({"message": "Order not found"}), 404
+    
+    product = db.session.get(Product, product_id)
+    if not product:
+         return jsonify({"message": "Product not found"}), 404
+     
+    order.products.remove(product)
+    db.session.commit()
+    
+    return jsonify({"message" : f"Product '{product_id}' successfully removed from Order {order_id}"}), 200 
 
 # Get all Orders for a User 
+@app.route("/orders/user/<int:user_id>", methods=["GET"])
+def get_orders(user_id):
+    # Check if the user exists
+    user = db.session.get(User, user_id)
+    if not user:
+        return jsonify({"message": "User not found"}), 404
+
+    # Retrieve orders along with their products
+    query = select(Order).where(Order.user_id == user_id)
+    orders = db.session.execute(query).scalars().all()
+
+    return orders_schema.jsonify(orders), 200
+
 
 # Get all Products for an Order
-
+@app.route("/orders/<int:order_id>/products", methods=["GET"])
+def get_products_for_order(order_id):
+    # Check if order exists
+    order = db.session.get(Order, order_id)
+    if not order:
+        return jsonify({"message": "Order not found"}), 404  
+    
+    products = order.products
+    
+    return products_schema.jsonify(products), 200 
 
 
 if __name__ == "__main__":
