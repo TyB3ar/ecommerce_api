@@ -1,17 +1,18 @@
-# E-Commerce API
+# 🛍️ E-Commerce API
 
 ## Overview
 This API provides functionality to manage users, products, and orders in an e-commerce system. It supports CRUD operations for users and products, as well as order placement and product association.
 
 ## Features
-- **User Management**: Create, retrieve, update, and delete users.
-- **Product Management**: Manage product inventory with pricing details.
-- **Order Processing**: Place orders and associate products with them.
-- **Validation & Serialization**: Uses Marshmallow for data validation.
-- **Relational Database Management**: Implements ORM using SQLAlchemy.
+- 🔐 **User Management** – Create, read, update, and delete users
+- 📦 **Product Management** – Manage product catalog and pricing
+- 🛒 **Order Processing** – Place orders and associate products
+- ✅ **Input Validation** – Enforced via Marshmallow schemas
+- 🗄️ **Database Integration** – Uses SQLAlchemy ORM with MySQ
+
 
 ## Technologies Used
-- Python
+- Python 3.x
 - Flask
 - Flask-SQLAlchemy
 - Marshmallow (for serialization & validation)
@@ -31,6 +32,7 @@ This API provides functionality to manage users, products, and orders in an e-co
 
 4. **Run the Application**:
     python app.py
+
 
 # API Endpoints
 
@@ -61,6 +63,28 @@ This API provides functionality to manage users, products, and orders in an e-co
 | GET | /orders/user/<user_id> | Retrieve all orders for a user | 
 | GET | /orders/<order_id>/products | Retrieve all products in an order | 
 
+# Example: Creating a User 
+## POST /users 
+
+### Request 
+```bash
+{
+  "name": "Alice",
+  "address": "123 Main St",
+  "email": "alice@example.com"
+}
+```
+### Response 
+```bash
+{
+  "id": 1,
+  "name": "Alice",
+  "address": "123 Main St",
+  "email": "alice@example.com"
+}
+```
+
+
 # Schema Overview 
 
 ## Models: 
@@ -70,3 +94,9 @@ This API provides functionality to manage users, products, and orders in an e-co
 
 ## Validation: 
 - Uses Marshmallow to validate incoming requests and ensure proper data formatting
+
+## Contributing
+Pull requests are welcome. For major changes, please open an issue first to discuss what you’d like to change.
+
+## Author
+Developed my Tyler Wronski, for Coding Temple project. 
