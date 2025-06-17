@@ -1,117 +1,44 @@
-'''
-from flask import Flask, request, jsonify
-from flask_sqlalchemy import SQLAlchemy
-from flask_marshmallow import Marshmallow
-from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column, relationship
-from sqlalchemy import ForeignKey, Table, Column, String, select, DateTime, Float, UniqueConstraint
-from marshmallow import ValidationError, fields
-from typing import List, Optional
+from flask import request, jsonify
+from marshmallow import ValidationError
 from datetime import datetime
-
-# Initialize Flask App 
-app = Flask(__name__) 
-
-# DB Configuration 
-app.config['SQLALCHEMY_DATABASE_URI'] = 'mysql+mysqlconnector://root:<YOUR_PASSWORD>@localhost/ecommerce_api'
-app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
-
-# Base Model 
-class Base(DeclarativeBase): 
-    pass 
-
-# Initialize SQLAlchemy and Marshmallow 
-db = SQLAlchemy(model_class=Base) 
-db.init_app(app) 
-ma = Marshmallow(app) 
-
-# ----- Models ----- 
-
-# Order-Products Association Table 
-order_products = Table(
-    "order_product", 
-    Base.metadata, 
-    Column("order_id", ForeignKey("orders.id"), primary_key=True),
-    Column("product_id", ForeignKey("products.id"), primary_key=True),
-    UniqueConstraint("order_id", "product_id", name="uq_order_product") # Ensure unique products 
+from sqlalchemy import select
+from models import  User, Product, Order
+from schemas import (
+    user_schema, users_schema,
+    product_schema, products_schema,
+    order_schema, orders_schema
 )
-
-# User Model
-class User(Base):
-    __tablename__ = "users"
-    
-    id: Mapped[int] = mapped_column(primary_key=True)
-    name: Mapped[str] = mapped_column(String(50), nullable=False)
-    address: Mapped[str] = mapped_column(String(100), nullable=False)
-    email: Mapped[Optional[str]] = mapped_column(String(200), unique=True) 
-    
-    # One-to-Many Relationship with Orders (one user can place many orders)
-    orders: Mapped[List["Order"]] = relationship("Order", back_populates="user")
-    
-# Order Model
-class Order(Base):
-    __tablename__ = "orders"
-    
-    id: Mapped[int] = mapped_column(primary_key=True)
-    order_date: Mapped[DateTime] = mapped_column(DateTime, nullable=False) 
-    user_id: Mapped[int] = mapped_column(ForeignKey("users.id"), nullable=False)
+from extensions import db 
 
 
-    # One-to-Many with User (one user many orders) 
-    user: Mapped["User"] = relationship("User", back_populates="orders")
-    # Many to Many with Products
-    products: Mapped[List["Product"]] = relationship("Product", secondary=order_products, back_populates="orders")
-    
-# Product Model 
-class Product(Base):
-    __tablename__ = "products"
-    
-    id: Mapped[int] = mapped_column(primary_key=True)
-    product_name: Mapped[str] = mapped_column(String(50), nullable=False)
-    price: Mapped[float] = mapped_column(Float, nullable=False)
-    
-    # many to many with orders
-    orders: Mapped[List["Order"]] = relationship("Order", secondary=order_products, back_populates="products")
-    
+def register_routes(app):
+    # User routes
+    app.add_url_rule("/users", view_func=get_users, methods=["GET"])
+    app.add_url_rule("/users/<int:id>", view_func=get_user, methods=["GET"])
+    app.add_url_rule("/users", view_func=create_user, methods=["POST"])
+    app.add_url_rule("/users/<int:id>", view_func=update_user, methods=["PUT"])
+    app.add_url_rule("/users/<int:id>", view_func=delete_user, methods=["DELETE"])
 
-# ----- Schemas ----- 
+    # Product routes
+    app.add_url_rule("/products", view_func=get_products, methods=["GET"])
+    app.add_url_rule("/products/<int:id>", view_func=get_product, methods=["GET"])
+    app.add_url_rule("/products", view_func=create_product, methods=["POST"])
+    app.add_url_rule("/products/<int:id>", view_func=update_product, methods=["PUT"])
+    app.add_url_rule("/products/<int:id>", view_func=delete_product, methods=["DELETE"])
 
-# User Schema 
-class UserSchema(ma.SQLAlchemyAutoSchema):
-     class Meta:
-        model = User
-         
-# Order Schema
-class OrderSchema(ma.SQLAlchemyAutoSchema):
-    class Meta:
-        model = Order
-        include_fk = True
-        
-    products = ma.Nested("ProductSchema", many=True) 
-    order_date = fields.DateTime(format="%Y-%m-%dT%H:%M:%S")
-        
-# Product Schema
-class ProductSchema(ma.SQLAlchemyAutoSchema):
-    class Meta: 
-        model = Product
-        
+    # Order routes
+    app.add_url_rule("/orders", view_func=create_order, methods=["POST"])
+    app.add_url_rule("/orders/<int:order_id>/add_product/<int:product_id>", view_func=add_product_to_order, methods=["PUT"])
+    app.add_url_rule("/orders/<int:order_id>/remove_product/<int:product_id>", view_func=delete_product_from_order, methods=["DELETE"])
+    app.add_url_rule("/orders/user/<int:user_id>", view_func=get_orders, methods=["GET"])
+    app.add_url_rule("/orders/<int:order_id>/products", view_func=get_products_for_order, methods=["GET"])
 
-# ----- Instances of schemas 
-user_schema = UserSchema() # individual user
-users_schema = UserSchema(many=True) # many users 
-
-order_schema = OrderSchema() # single order 
-orders_schema = OrderSchema(many=True) # many orders 
-
-product_schema = ProductSchema() # single product
-products_schema = ProductSchema(many=True) # many products
-
-
+# --- Route Functions --- 
 # ----- Routes ----- 
 
 # --- User Endpoints ---
 
 # Retrieve all Users
-@app.route('/users', methods=["GET"])
 def get_users():
     query = select(User)
     users = db.session.execute(query).scalars().all()
@@ -119,7 +46,6 @@ def get_users():
     return users_schema.jsonify(users), 200 
 
 # Retrieve User by ID                                    
-@app.route('/users/<int:id>', methods=["GET"])
 def get_user(id):
     user = db.session.get(User, id)
     
@@ -129,7 +55,6 @@ def get_user(id):
     return user_schema.jsonify(user), 200 
 
 # Create New User
-@app.route("/users", methods=["POST"])
 def create_user():
     try:
         user_data = user_schema.load(request.json) # deserialize json data 
@@ -143,7 +68,6 @@ def create_user():
     return user_schema.jsonify(new_user), 201 
 
 # Update User by ID
-@app.route('/users/<int:id>', methods=["PUT"])
 def update_user(id):
     user = db.session.get(User, id)
     
@@ -163,7 +87,6 @@ def update_user(id):
     return user_schema.jsonify(user), 200 
 
 # Delete User by ID 
-@app.route('/users/<int:id>', methods=["DELETE"]) 
 def delete_user(id):
     user = db.session.get(User, id)
     
@@ -178,7 +101,6 @@ def delete_user(id):
 # --- Product Endpoints ---
 
 # Retrieve All Products
-@app.route("/products", methods=["GET"])
 def get_products():
     query = select(Product) 
     products = db.session.execute(query).scalars().all()
@@ -186,7 +108,6 @@ def get_products():
     return products_schema.jsonify(products), 200 
 
 # Retrieve Product by ID
-@app.route("/products/<int:id>", methods=["GET"])
 def get_product(id):
     product = db.session.get(Product, id)
     
@@ -196,7 +117,6 @@ def get_product(id):
     return product_schema.jsonify(product), 200 
 
 # Create a new Product
-@app.route("/products", methods=["POST"])
 def create_product():
     try:
         product_data = product_schema.load(request.json) # deserialize json data 
@@ -207,10 +127,9 @@ def create_product():
     db.session.add(new_product)
     db.session.commit()
     
-    return product_schema.jsonify(new_product), 200  
+    return product_schema.jsonify(new_product), 200
 
 # Update Product by ID
-@app.route("/products/<int:id>", methods=["PUT"])
 def update_product(id):
     product = db.session.get(Product, id)
     
@@ -229,7 +148,6 @@ def update_product(id):
     return product_schema.jsonify(product), 200 
 
 # Delete Product by ID 
-@app.route('/products/<int:id>', methods=["DELETE"]) 
 def delete_product(id):
     product = db.session.get(Product, id)
     
@@ -244,7 +162,6 @@ def delete_product(id):
 # --- Order Endpoints --- 
 
 # Create a new Order (requires user ID and Order Date) 
-@app.route("/orders", methods=["POST"])
 def create_order():
     try:
         order_data = request.json
@@ -267,7 +184,6 @@ def create_order():
         
 
 # Add product to an Order (prevent duplicates) 
-@app.route("/orders/<int:order_id>/add_product/<int:product_id>", methods=["PUT"])
 def add_product_to_order(order_id, product_id):
     order = db.session.get(Order, order_id)
     if not order:
@@ -290,7 +206,6 @@ def add_product_to_order(order_id, product_id):
 
 
 # Remove Product from an Order
-@app.route("/orders/<int:order_id>/remove_product/<int:product_id>", methods=["DELETE"])
 def delete_product_from_order(order_id, product_id):
     order = db.session.get(Order, order_id)
     if not order:
@@ -306,7 +221,6 @@ def delete_product_from_order(order_id, product_id):
     return jsonify({"message" : f"Product '{product_id}' successfully removed from Order {order_id}"}), 200 
 
 # Get all Orders for a User 
-@app.route("/orders/user/<int:user_id>", methods=["GET"])
 def get_orders(user_id):
     # Check if the user exists
     user = db.session.get(User, user_id)
@@ -321,7 +235,6 @@ def get_orders(user_id):
 
 
 # Get all Products for an Order
-@app.route("/orders/<int:order_id>/products", methods=["GET"])
 def get_products_for_order(order_id):
     # Check if order exists
     order = db.session.get(Order, order_id)
@@ -332,34 +245,3 @@ def get_products_for_order(order_id):
     
     return products_schema.jsonify(products), 200 
 
-
-if __name__ == "__main__":
-    with app.app_context():
-        db.create_all()
-    
-    app.run(debug=True)
-'''
-
-from flask import Flask
-from extensions import db, ma
-from routes import register_routes
-
-
-# Initialize Flask app
-app = Flask(__name__)
-app.config['SQLALCHEMY_DATABASE_URI'] = 'mysql+mysqlconnector://root:Hawaii2024*@localhost/ecommerce_api'
-app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
-
-# Init extensions
-db.init_app(app)
-ma.init_app(app)
-
-# Register routes
-register_routes(app)
-
-# Create tables
-with app.app_context():
-    db.create_all()
-
-if __name__ == "__main__":
-    app.run(debug=True)
