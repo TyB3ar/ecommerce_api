@@ -11,7 +11,7 @@ from datetime import datetime
 app = Flask(__name__) 
 
 # DB Configuration 
-app.config['SQLALCHEMY_DATABASE_URI'] = 'mysql+mysqlconnector://root:Hawaii2024*@localhost/ecommerce_api'
+app.config['SQLALCHEMY_DATABASE_URI'] = 'mysql+mysqlconnector://root:<YOUR_PASSWORD>@localhost/ecommerce_api'
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 
 # Base Model 
