@@ -99,4 +99,4 @@ This API provides functionality to manage users, products, and orders in an e-co
 Pull requests are welcome. For major changes, please open an issue first to discuss what you’d like to change.
 
 ## Author
-Developed my Tyler Wronski, for Coding Temple project. 
+Developed by Tyler Wronski, for Coding Temple project. 
